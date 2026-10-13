@@ -1,19 +1,25 @@
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
-from loan_application.exceptions import NotFoundError, InvalidInputError
+from decimal import ROUND_HALF_UP, Decimal
+
 from sqlalchemy.orm import Session
 
-from loan_application.exceptions import CustomerNotFound
+from loan_application.exceptions import (
+    CustomerNotFound,
+    InvalidInputError,
+    NotFoundError,
+)
 from loan_application.repositories import customer_repositories, loan_repositories
 from loan_application.schemas.loan_schemas import LoanApplyIn
 from loan_application.tables import Customer, Loan
+VALID_STATUSES = {"APPROVED", "REJECTED"}
+from loan_application.services import customer_services
 
 INTEREST_RATES = {
-    12: Decimal("10"),
-    24: Decimal("11"),
-    36: Decimal("12"),
-    48: Decimal("13"),
-    60: Decimal("13"),
+    12: Decimal(10),
+    24: Decimal(11),
+    36: Decimal(12),
+    48: Decimal(13),
+    60: Decimal(13),
 }
 
 
@@ -74,11 +80,15 @@ def apply_for_loan(db: Session, data: LoanApplyIn) -> Loan:
     db.refresh(loan)
     return loan
 
+
 def get_loan(db: Session, loan_id: int) -> Loan:
+    if loan_id <= 0: 
+        raise InvalidInputError("id must be a positive integer")
     loan = loan_repositories.get_by_id(db, loan_id)
     if loan is None:
-        raise NotFoundError("Loan not found")
+        raise NotFoundError(f"Loan {loan_id} not found")
     return loan
+
 
 def risk_band(ratio: Decimal) -> str:
     if ratio < 30:
@@ -117,10 +127,6 @@ def get_customer_summary(db: Session, customer_id: int) -> dict:
         "emi_to_income_ratio": ratio,
         "risk_band": risk_band(ratio),
     }
-
-
-
-
 
 
 def approve_loan(db: Session, loan_id: int) -> Loan:
@@ -186,9 +192,7 @@ def list_loans_for_customer(
     if status is not None:
         status = status.upper()
         if status not in {"APPROVED", "REJECTED"}:
-            raise InvalidInputError(
-                "Status must be APPROVED or REJECTED"
-            )
+            raise InvalidInputError("Status must be APPROVED or REJECTED")
 
     return loan_repositories.list_for_customer(
         db,
@@ -197,3 +201,13 @@ def list_loans_for_customer(
     )
 
 
+
+
+
+
+def list_customer_loans(db: Session, customer_id: int, status: str | None = None):
+    if status is not None and status not in VALID_STATUSES:
+        raise InvalidInputError("status must be APPROVED or REJECTED")
+
+    customer_services.get_customer(db, customer_id)  # raises 400 or 404
+    return loan_repositories.list_by_customer(db, customer_id, status)

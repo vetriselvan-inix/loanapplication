@@ -1,10 +1,12 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from loan_application.exceptions import ConflictError, CustomerNotFound
+from loan_application.exceptions import ConflictError, CustomerNotFound,InvalidInputError
 from loan_application.repositories import customer_repositories
 from loan_application.schemas.customer_schemas import CustomerIn
 from loan_application.tables import Customer
+from loan_application.exceptions import InvalidInputError, CustomerNotFound
+from loan_application.repositories import customer_repositories  
 
 DUPLICATE_EMAIL = "Customer with this email already exists"
 
@@ -17,7 +19,13 @@ def _commit(db: Session, message: str) -> None:
         raise ConflictError(message)
 
 
-def get_customer(db: Session, customer_id: int) -> Customer:
+
+from loan_application.repositories import customer_repositories  
+
+
+def get_customer(db, customer_id: int):
+    if customer_id < 0:
+        raise InvalidInputError("id must be a positive integer")
     customer = customer_repositories.get_by_id(db, customer_id)
     if customer is None:
         raise CustomerNotFound(customer_id)
@@ -38,6 +46,7 @@ def create_customer(db: Session, data: CustomerIn) -> Customer:
     db.refresh(customer)
 
     return customer
+
 
 def update_customer(db: Session, customer_id: int, data: CustomerIn) -> Customer:
     customer = get_customer(db, customer_id)
