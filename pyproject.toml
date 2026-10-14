@@ -38,6 +38,10 @@ dev = [
 pythonpath=["src"]
 testpaths=["tests"]
 
+[tool.coverage.run]
+branch = true
+omit = ["*/seed.py"]
+
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
     "fastapi.Depends",
