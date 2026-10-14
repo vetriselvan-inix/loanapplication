@@ -37,5 +37,20 @@ def create_customer_user(username: str, password: str, customer_id: int) -> None
         db.commit()
         print("Customer user created")
 
+def create_officer_user(username: str, password: str) -> None:
+    with SessionLocal() as db:
+        if user_repositories.get_by_username(db, username):
+            print("User already exists")
+            return
+        db.add(
+            User(
+                username=username,
+                password_hash=hash_password(password),
+                role=UserRole.OFFICER,
+            )
+        )
+        db.commit()
+        print("Officer created")
+
 if __name__ == "__main__":
     main()

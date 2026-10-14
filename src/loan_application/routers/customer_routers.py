@@ -18,7 +18,7 @@ router = APIRouter(prefix="/customers", tags=["Customers"],  dependencies=[Depen
 officer_only = [Depends(require_roles(UserRole.OFFICER))]
 
 
-@router.post("/", response_model=CustomerOut, status_code=201)
+@router.post("/", response_model=CustomerOut, status_code=201,dependencies=officer_only)
 def add_customer(data: CustomerIn, db: Session = Depends(get_db)):
     return customer_services.create_customer(db, data)
 
@@ -72,4 +72,4 @@ def customer_loans(
     user: User = Depends(get_current_user),
     ):
     ensure_can_access_customer(user, customer_id)
-    return loan_services.list_customer_loans(db, customer_id, status)
+    return loan_services.list_loans_for_customer(db, customer_id, status)

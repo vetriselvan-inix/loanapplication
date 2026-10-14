@@ -1,14 +1,14 @@
-import random
+import random,re
 from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator,EmailStr
 
 
 class CustomerIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    email: str
+    email: EmailStr
     phone: str = Field(
         default_factory=lambda: str(random.randint(1000000000, 9999999999))
     )
@@ -48,9 +48,10 @@ class CustomerIn(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def normalize_email(cls, value: str) -> str:
-        return value.strip().lower()
-
+    def check_email(cls, v: str) -> str:
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
+            raise ValueError("Invalid email address")
+        return v
 
 class CustomerOut(CustomerIn):
     id: int
