@@ -184,6 +184,8 @@ def list_loans_for_customer(
     customer_id: int,
     status: str | None = None,
 ) -> list[Loan]:
+    if customer_id <= 0:
+        raise InvalidInputError("id must be a positive integer")
     customer = customer_repositories.get_by_id(db, customer_id)
 
     if customer is None:

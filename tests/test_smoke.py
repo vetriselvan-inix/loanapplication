@@ -4,14 +4,13 @@ from loan_application.main import app
 
 client = TestClient(app)
 
-
-def test_docs_page_loads():
+def test_docs_page_loads(client):
     response = client.get("/docs")
     assert response.status_code == 200
 
 
-def test_get_missing_customer_returns_404():
-    response = client.get("/customers/9999")
+def test_get_missing_customer_returns_404(client, officer_headers):
+    response = client.get("/customers/9999", headers=officer_headers)
     assert response.status_code == 404
     assert response.json() == {
         "error": "NOT_FOUND",
