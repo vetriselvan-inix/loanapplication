@@ -1,6 +1,7 @@
-from pydantic import BaseModel,Field
+from pydantic import BaseModel, Field
 
 from loan_application.schemas.customer_schemas import CustomerIn
+
 
 class TokenResponse(BaseModel):
     access_token: str

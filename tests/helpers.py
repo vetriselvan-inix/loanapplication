@@ -19,13 +19,13 @@ def _letters(n):
 
 def make_customer(db, **overrides):
     n = next(_n)
-    data = dict(
-        name=f"Customer{_letters(n)}",
-        email=f"customer{n}@example.com",
-        phone=f"9{n:09d}",
-        date_of_birth=date(1990, 1, 1),
-        monthly_income=Decimal("50000.00"),
-    )
+    data = {
+        "name": f"Customer{_letters(n)}",
+        "email": f"customer{n}@example.com",
+        "phone": f"9{n:09d}",
+        "date_of_birth": date(1990, 1, 1),
+        "monthly_income": Decimal("50000.00"),
+    }
     data.update(overrides)
     obj = Customer(**data)
     db.add(obj)
@@ -36,12 +36,12 @@ def make_customer(db, **overrides):
 
 def make_user(db, customer=None, role=UserRole.CUSTOMER, **overrides):
     n = next(_n)
-    data = dict(
-        username=f"user{n}",
-        password_hash=_HASH,
-        role=role,
-        customer_id=customer.id if customer else None,
-    )
+    data = {
+        "username": f"user{n}",
+        "password_hash": _HASH,
+        "role": role,
+        "customer_id": customer.id if customer else None,
+    }
     data.update(overrides)
     obj = User(**data)
     db.add(obj)
@@ -51,14 +51,14 @@ def make_user(db, customer=None, role=UserRole.CUSTOMER, **overrides):
 
 
 def make_loan(db, customer, **overrides):
-    data = dict(
-        customer_id=customer.id,
-        amount=Decimal("100000.00"),
-        tenure_months=12,
-        interest_rate=Decimal("10"),
-        emi=Decimal("8791.59"),
-        status="APPROVED",
-    )
+    data = {
+        "customer_id": customer.id,
+        "amount": Decimal("100000.00"),
+        "tenure_months": 12,
+        "interest_rate": Decimal(10),
+        "emi": Decimal("8791.59"),
+        "status": "APPROVED",
+    }
     data.update(overrides)
     obj = Loan(**data)
     db.add(obj)

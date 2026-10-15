@@ -1,9 +1,10 @@
-import random,re
-from datetime import date
+import random
+import re
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator,EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class CustomerIn(BaseModel):
@@ -35,7 +36,7 @@ class CustomerIn(BaseModel):
     @field_validator("date_of_birth")
     @classmethod
     def dob_must_be_in_past(cls, value: date) -> date:
-        if value >= date.today():
+        if value >= datetime.now().astimezone().date():
             raise ValueError("Date of birth must be in the past")
         return value
 

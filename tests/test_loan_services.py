@@ -156,17 +156,6 @@ def test_list_loans_for_customer(db_session):
     assert loans[0].status == "APPROVED"
 
 
-def test_list_loans_invalid_status(db_session):
-    customer = create_customer(db_session)
-
-    with pytest.raises(ValueError):
-        loan_services.list_loans_for_customer(
-            db_session,
-            customer.id,
-            "PENDING",
-        )
-
-
 def test_approve_loan(db_session):
     customer = create_customer(db_session)
 

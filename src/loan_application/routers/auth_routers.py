@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from loan_application.db import get_db
-from loan_application.schemas.auth_schemas import TokenResponse,RegisterIn, RegisterOut
+from loan_application.schemas.auth_schemas import RegisterIn, RegisterOut, TokenResponse
 from loan_application.security import create_access_token
 from loan_application.services import auth_services
 

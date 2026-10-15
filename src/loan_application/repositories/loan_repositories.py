@@ -1,17 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
 from loan_application.tables import Loan
-
-
-
-
-def count_approved_for_customer(db: Session, customer_id: int) -> int:
-    stmt = (
-        select(func.count())
-        .select_from(Loan)
-        .where(Loan.customer_id == customer_id, Loan.status == "APPROVED")
-    )
-    return db.scalar(stmt)
 
 
 def add(db: Session, loan: Loan) -> None:

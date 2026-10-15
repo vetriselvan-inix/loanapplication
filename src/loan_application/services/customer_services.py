@@ -1,12 +1,14 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from loan_application.exceptions import ConflictError, CustomerNotFound,InvalidInputError
+from loan_application.exceptions import (
+    ConflictError,
+    CustomerNotFound,
+    InvalidInputError,
+)
 from loan_application.repositories import customer_repositories
 from loan_application.schemas.customer_schemas import CustomerIn
 from loan_application.tables import Customer
-from loan_application.exceptions import InvalidInputError, CustomerNotFound
-from loan_application.repositories import customer_repositories  
 
 DUPLICATE_EMAIL = "Customer with this email already exists"
 
@@ -20,7 +22,6 @@ def _commit(db: Session, message: str) -> None:
 
 
 
-from loan_application.repositories import customer_repositories  
 
 
 def get_customer(db, customer_id: int):

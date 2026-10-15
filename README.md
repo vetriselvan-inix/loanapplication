@@ -46,7 +46,11 @@ loanapplication/
 ├── tests/                  # Automated tests (run with pytest)
 ├── postman/                # Postman collection for trying the APIs
 ├── .postman/               # Postman workspace metadata
-├── docker-compose.yml      # PostgreSQL database for local development
+├── Dockerfile              # API image
+├── docker-entrypoint.sh    # Runs migrations and seeding, then starts the server
+├── docker-compose.yml      # API + PostgreSQL
+├── .env.example            # Template for .env (copy and fill in)
+├── .github/workflows/      # CI pipeline
 ├── pyproject.toml          # Project metadata, dependencies and pytest settings
 ├── uv.lock                 # Exact locked dependency versions
 ├── .python-version         # Python version used by uv
@@ -70,58 +74,60 @@ Keeping the database code in one layer means the endpoints stay short and the lo
 
 ### What you need first
 
-- [Python 3.12+](https://www.python.org/downloads/)
-- [uv](https://docs.astral.sh/uv/)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (it must be running)
 - Git
+- For local development without Docker: [Python 3.12+](https://www.python.org/downloads/) and [uv](https://docs.astral.sh/uv/)
 
-### 1. Clone and install
+### Option A: run everything in Docker (API + PostgreSQL)
 
 ```bash
 git clone https://github.com/vetriselvan-inix/loanapplication.git
 cd loanapplication
-uv sync
+cp .env.example .env
 ```
 
-`uv sync` creates the virtual environment and installs everything from `uv.lock`.
-
-### 2. Start the database
+Open `.env` and replace every `change-me` value. Generate a JWT secret with:
 
 ```bash
-docker compose up -d
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-This starts PostgreSQL 16 on port `5432` with these **local development** credentials:
-
-| Setting | Value |
-|---|---|
-| Database | `loan_db` |
-| User | `vetri` |
-| Password | `vetri1234` |
-| Host / Port | `localhost` / `5432` |
-
-Check it is up with `docker ps`. The data is stored in a Docker volume called `pgdata`, so it survives restarts.
-
-### 3. Create the tables
+Then start the stack:
 
 ```bash
-uv run alembic upgrade head
+docker compose up -d --build
 ```
 
-This runs the migrations and creates the `customers` and `loans` tables.
-
-### 4. Run the API
-
-```bash
-uv run uvicorn loan_application.main:app --reload
-```
-
-Then open:
+The `api` container waits for the database to be healthy, runs `alembic upgrade head`, creates the officer user from `SEED_OFFICER_USERNAME` / `SEED_OFFICER_PASSWORD` (skipped if unset), and starts the server on port `8000`.
 
 - Health check: http://127.0.0.1:8000/health
 - Interactive API docs: http://127.0.0.1:8000/docs
 
+### Option B: run the API locally, database in Docker
+
+```bash
+uv sync
+cp .env.example .env          # then fill in the values as above
+docker compose up -d db
+uv run alembic upgrade head
+uv run python -m loan_application.seed
+uv run uvicorn loan_application.main:app --reload
+```
+
+`DATABASE_URL` in `.env` points at `localhost`, which is right for this option. Inside compose, the `api` service overrides it to use the `db` host.
+
 If `/health` returns `{"status":"ok","database":"connected"}`, everything is wired up correctly.
+
+## Configuration
+
+All settings and secrets come from environment variables (loaded from `.env` by `pydantic-settings`). `.env` is git-ignored; `.env.example` is the template.
+
+| Variable | Used by | Purpose |
+|---|---|---|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `db` container | Database credentials (applied only when the `pgdata` volume is first created) |
+| `DATABASE_URL` | API, Alembic | SQLAlchemy connection URL |
+| `JWT_SECRET_KEY` | API | Signs access tokens |
+| `SEED_OFFICER_USERNAME` / `SEED_OFFICER_PASSWORD` | Seed script | Optional initial officer account |
 
 ## API overview
 
@@ -223,10 +229,18 @@ Always read the generated file in `alembic/versions/` before applying it. Never 
 ## Running the tests
 
 ```bash
-uv run pytest
+uv run pytest --cov=loan_application
 ```
 
-pytest is configured in `pyproject.toml` to look for tests in `tests/` and to import code from `src/`.
+pytest is configured in `pyproject.toml` to look for tests in `tests/` and to import code from `src/`. Tests use an in-memory SQLite database, so PostgreSQL does not need to be running.
+
+## Continuous integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and on pushes to `main`:
+
+- `ruff check .`
+- `pytest` with a 90% coverage gate
+- `docker build` to make sure the image still builds
 
 ## Code quality
 
@@ -250,10 +264,12 @@ The `postman/` folder contains a collection you can import into Postman. Start t
 ## Useful Docker commands
 
 ```bash
-docker compose up -d       # start the database
-docker compose down        # stop it (data is kept)
-docker compose down -v     # stop it AND delete all data (use only on practice data)
-docker compose logs db     # see database logs
+docker compose up -d --build   # build and start the API and the database
+docker compose up -d db        # start only the database
+docker compose down            # stop everything (data is kept)
+docker compose down -v         # stop it AND delete all data (use only on practice data)
+docker compose logs api        # see API logs
+docker compose logs db         # see database logs
 ```
 
 To look inside the database:
@@ -269,14 +285,10 @@ Find the container name with `docker ps`. Inside `psql`, `\dt` lists the tables 
 | Problem | Likely cause and fix |
 |---|---|
 | `/health` returns `database unavailable` | The database is not running. Run `docker compose up -d` and check `docker ps` |
-| `password authentication failed` | The credentials in `db.py` do not match `docker-compose.yml`. Fix them, then `docker compose down -v` and `docker compose up -d` |
+| `password authentication failed` | The password in `DATABASE_URL` does not match the one the database was created with. `POSTGRES_PASSWORD` only applies when the `pgdata` volume is first created, so either reset it with `ALTER USER` or run `docker compose down -v` and start again |
 | Connection error with a strange host name | The password contains `@`, `:` or `/`, which breaks the connection URL. Use letters and numbers only |
 | Alembic generates an empty migration | `alembic/env.py` is not importing `models`, so Alembic cannot see the tables |
 | `ModuleNotFoundError: loan_application` | Run commands with `uv run`, and make sure `src/loan_application/__init__.py` exists |
-
-## A note on the credentials
-
-The database user and password in `docker-compose.yml` are for **local development only**. For anything beyond practice, move them into environment variables (this is what `pydantic-settings` is installed for) and never commit real secrets.
 
 ## What I learned building this
 
