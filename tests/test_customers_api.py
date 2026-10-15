@@ -1,5 +1,4 @@
 import pytest
-
 from helpers import customer_payload, make_customer, make_loan
 
 

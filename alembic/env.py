@@ -1,8 +1,9 @@
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
-from loan_application.config import settings
+
 from alembic import context
+from loan_application.config import settings
 from loan_application.tables import Base
 
 # this is the Alembic Config object, which provides

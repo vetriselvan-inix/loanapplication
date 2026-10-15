@@ -2,18 +2,19 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from loan_application.routers import auth_routers
-from loan_application.logging_context import setup_logging
 
 from loan_application.db import get_db
 from loan_application.exceptions import ConflictError, InvalidInputError, NotFoundError
+from loan_application.logging_context import setup_logging
+from loan_application.routers import auth_routers
 from loan_application.routers.customer_routers import router as customers_router
 from loan_application.routers.loan_routers import (
     router as loans_router,  # replace the first one so changed name
 )
+
 setup_logging()
 app = FastAPI(title="Loan Application Service")
 app.include_router(loans_router)
@@ -26,7 +27,7 @@ def health(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
-    except Exception:
+    except SQLAlchemyError:
         raise HTTPException(status_code=503, detail="database unavailable")
 
 

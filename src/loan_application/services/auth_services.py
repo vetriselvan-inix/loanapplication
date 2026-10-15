@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
+
 from loan_application.exceptions import ConflictError
 from loan_application.repositories import user_repositories
-from loan_application.security import verify_password, hash_password
-from loan_application.tables import User,UserRole
-from loan_application.services import customer_services
 from loan_application.schemas.customer_schemas import CustomerIn
+from loan_application.security import hash_password, verify_password
+from loan_application.services import customer_services
+from loan_application.tables import User, UserRole
 
 
 def authenticate_user(db: Session, username: str, password: str) -> User | None:

@@ -1,8 +1,7 @@
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
-
 from helpers import make_customer, make_loan
 
 
@@ -28,7 +27,7 @@ def test_customer_applies_for_themselves(client, alice, alice_headers):
 
 
 def test_underage_customer_is_rejected_not_errored(client, officer_headers, db):
-    young = make_customer(db, date_of_birth=date.today() - timedelta(days=365 * 19))
+    young = make_customer(db, date_of_birth=datetime.now().astimezone().date() - timedelta(days=365 * 19))
     r = apply(client, officer_headers, young.id)
     assert r.status_code == 201
     assert r.json()["status"] == "REJECTED"

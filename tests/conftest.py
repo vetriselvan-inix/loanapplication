@@ -1,10 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
+from helpers import login_headers, make_customer, make_user
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from helpers import login_headers, make_customer, make_user
 from loan_application.db import get_db
 from loan_application.main import app
 from loan_application.tables import Base, UserRole

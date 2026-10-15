@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from loan_application.exceptions import (
 from loan_application.repositories import customer_repositories, loan_repositories
 from loan_application.schemas.loan_schemas import LoanApplyIn
 from loan_application.tables import Customer, Loan
+
 VALID_STATUSES = {"APPROVED", "REJECTED"}
 from loan_application.services import customer_services
 
@@ -36,7 +37,7 @@ def calculate_emi(principal: Decimal, annual_rate: Decimal, months: int) -> Deci
 
 def check_eligibility(db: Session, customer: Customer, amount: Decimal) -> str | None:
     """Return the rejection reason of the first failed rule, or None if eligible."""
-    age = calculate_age(customer.date_of_birth, date.today())
+    age = calculate_age(customer.date_of_birth, datetime.now().astimezone().date())
     if not (21 <= age <= 60):
         return "Age must be between 21 and 60"
 

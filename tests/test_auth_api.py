@@ -1,15 +1,15 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
-
 from helpers import PASSWORD, customer_payload, make_loan, make_user
+
 from loan_application.config import settings
 from loan_application.tables import UserRole
 
 
 def make_token(sub, minutes=30, key=None):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {"sub": str(sub), "role": "OFFICER", "iat": now,
                "exp": now + timedelta(minutes=minutes)}
     return jwt.encode(payload, key or settings.jwt_secret_key,

@@ -2,16 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from loan_application.db import get_db
+from loan_application.dependencies.auth import (
+    authenticated_user,
+    get_current_user,
+    require_roles,
+)
 from loan_application.schemas.customer_schemas import (
     CustomerIn,
     CustomerOut,
     CustomerSummaryOut,
     MessageOut,
 )
-from loan_application.dependencies.auth import get_current_user, require_roles,authenticated_user
+from loan_application.schemas.loan_schemas import LoanOut
 from loan_application.services import customer_services, loan_services
 from loan_application.services.access import ensure_can_access_customer
-from loan_application.schemas.loan_schemas import LoanOut
 from loan_application.tables import User, UserRole
 
 router = APIRouter(prefix="/customers", tags=["Customers"],  dependencies=[Depends(authenticated_user)],)

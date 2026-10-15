@@ -22,7 +22,7 @@ from loan_application.tables import UserRole
 
 
 def test_emi():
-    assert calculate_emi(Decimal("100000"), Decimal("10"), 12) == Decimal("8791.59")
+    assert calculate_emi(Decimal(100000), Decimal(10), 12) == Decimal("8791.59")
 
 
 def test_age_before_and_on_birthday():
