@@ -1,9 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from loan_application.config import settings
 
-DATABASE_URL = "postgresql+psycopg://vetri:vetri1234@localhost:5432/loan_db"
 
-engine = create_engine(DATABASE_URL)
+
+engine = create_engine(settings.database_url)
 SessionLocal = sessionmaker(bind=engine)
 
 

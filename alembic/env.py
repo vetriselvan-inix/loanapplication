@@ -1,16 +1,14 @@
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
-
+from loan_application.config import settings
 from alembic import context
 from loan_application.tables import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option(
-    "sqlalchemy.url", "postgresql+psycopg://vetri:vetri1234@localhost:5432/loan_db"
-)
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
