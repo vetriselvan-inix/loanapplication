@@ -1,25 +1,18 @@
+from loan_application.config import settings
 from loan_application.db import SessionLocal
 from loan_application.repositories import user_repositories
 from loan_application.security import hash_password
 from loan_application.tables import User, UserRole
-USERNAME = "officer"
-PASSWORD = "ChangeMe123!"
 
 
 def main() -> None:
-    with SessionLocal() as db:
-        if user_repositories.get_by_username(db, USERNAME):
-            print("Officer already exists")
-            return
-        db.add(
-            User(
-                username=USERNAME,
-                password_hash=hash_password(PASSWORD),
-                role=UserRole.OFFICER,
-            )
-        )
-        db.commit()
-        print("Officer created")
+    username = settings.seed_officer_username
+    password = settings.seed_officer_password
+    if not username or not password:
+        print("SEED_OFFICER_USERNAME/SEED_OFFICER_PASSWORD not set, skipping")
+        return
+    create_officer_user(username, password)
+
 
 def create_customer_user(username: str, password: str, customer_id: int) -> None:
     with SessionLocal() as db:
