@@ -162,7 +162,7 @@ def test_register_duplicate_username_is_409(client):
 def test_register_duplicate_email_is_409(client):
     client.post("/auth/register", json=register_body())
     r = client.post("/auth/register", json=register_body(username="other_user", phone="9111111111"))
-    assert r.status_code == 409
+    assert r.status_code == 409 
 
 
 def test_register_short_password_is_400(client):
