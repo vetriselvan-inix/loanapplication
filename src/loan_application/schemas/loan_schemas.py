@@ -29,6 +29,18 @@ class LoanOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LoanPage(BaseModel):
+    """One page of loans plus the metadata a client needs to page through them."""
+
+    items: list[LoanOut]
+    page: int
+    size: int
+    total: int
+    total_pages: int
+    has_next: bool
+    has_previous: bool
+
+
 class LoanSummaryOut(BaseModel):
     customer_id: int
     customer_name: str

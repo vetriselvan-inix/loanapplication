@@ -10,3 +10,7 @@ def get_by_username(db: Session, username: str) -> User | None:
 
 def get_by_id(db: Session, user_id: int) -> User | None:
     return db.get(User, user_id)
+
+
+def add(db: Session, user: User) -> None:
+    db.add(user)

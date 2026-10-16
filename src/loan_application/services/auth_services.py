@@ -5,6 +5,7 @@ from loan_application.repositories import user_repositories
 from loan_application.schemas.customer_schemas import CustomerIn
 from loan_application.security import hash_password, verify_password
 from loan_application.services import customer_services
+from loan_application.services.transaction import transaction
 from loan_application.tables import User, UserRole
 
 
@@ -21,14 +22,15 @@ def register_user(db: Session, data) -> tuple[User, int]:
         raise ConflictError("Username already taken")
 
     customer_data = CustomerIn(**data.model_dump(exclude={"username", "password"}))
-    customer = customer_services.create_customer(db, customer_data)
 
-    user = User(
-        username=data.username,
-        password_hash=hash_password(data.password),
-        role=UserRole.CUSTOMER,
-        customer_id=customer.id,
-    )
-    db.add(user)
-    db.commit()
+    # Customer and user are one unit of work: both are saved or neither is.
+    with transaction(db, "Username, email or phone already exists"):
+        customer = customer_services.add_customer(db, customer_data)
+        user = User(
+            username=data.username,
+            password_hash=hash_password(data.password),
+            role=UserRole.CUSTOMER,
+            customer_id=customer.id,
+        )
+        user_repositories.add(db, user)
     return user, customer.id
