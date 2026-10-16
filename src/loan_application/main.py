@@ -12,12 +12,16 @@ from loan_application.logging_context import setup_logging
 from loan_application.routers import auth_routers
 from loan_application.routers.customer_routers import router as customers_router
 from loan_application.routers.loan_routers import (
+    api_router as loans_api_router,
+)
+from loan_application.routers.loan_routers import (
     router as loans_router,  # replace the first one so changed name
 )
 
 setup_logging()
 app = FastAPI(title="Loan Application Service")
 app.include_router(loans_router)
+app.include_router(loans_api_router)
 app.include_router(customers_router)
 app.include_router(auth_routers.router)
 

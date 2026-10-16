@@ -10,10 +10,11 @@ from loan_application.exceptions import (
 )
 from loan_application.repositories import customer_repositories, loan_repositories
 from loan_application.schemas.loan_schemas import LoanApplyIn
-from loan_application.tables import Customer, Loan
+from loan_application.tables import Customer, Loan, User, UserRole
 
 VALID_STATUSES = {"APPROVED", "REJECTED"}
 from loan_application.services import customer_services
+from loan_application.services.transaction import transaction
 
 INTEREST_RATES = {
     12: Decimal(10),
@@ -76,8 +77,8 @@ def apply_for_loan(db: Session, data: LoanApplyIn) -> Loan:
             status="APPROVED",
         )
 
-    loan_repositories.add(db, loan)
-    db.commit()
+    with transaction(db):
+        loan_repositories.add(db, loan)
     db.refresh(loan)
     return loan
 
@@ -140,16 +141,15 @@ def approve_loan(db: Session, loan_id: int) -> Loan:
         return loan
 
     rate = INTEREST_RATES[loan.tenure_months]
-    loan.interest_rate = rate
-    loan.emi = calculate_emi(
-        loan.amount,
-        rate,
-        loan.tenure_months,
-    )
-    loan.status = "APPROVED"
-    loan.rejection_reason = None
-
-    db.commit()
+    with transaction(db):
+        loan.interest_rate = rate
+        loan.emi = calculate_emi(
+            loan.amount,
+            rate,
+            loan.tenure_months,
+        )
+        loan.status = "APPROVED"
+        loan.rejection_reason = None
     db.refresh(loan)
     return loan
 
@@ -160,12 +160,11 @@ def patch_loan(db: Session, loan_id: int) -> Loan:
     if loan is None:
         raise NotFoundError("Loan not found")
 
-    loan.status = "REJECTED"
-    loan.interest_rate = None
-    loan.emi = None
-    loan.rejection_reason = "Rejected by administrator"
-
-    db.commit()
+    with transaction(db):
+        loan.status = "REJECTED"
+        loan.interest_rate = None
+        loan.emi = None
+        loan.rejection_reason = "Rejected by administrator"
     db.refresh(loan)
     return loan
 
@@ -176,8 +175,40 @@ def delete_loan(db: Session, loan_id: int) -> None:
     if loan is None:
         raise NotFoundError("Loan not found")
 
-    db.delete(loan)
-    db.commit()
+    with transaction(db):
+        loan_repositories.delete(db, loan)
+
+
+def normalize_status(status: str | None) -> str | None:
+    """Uppercase the status filter and reject anything but APPROVED/REJECTED."""
+    if status is None:
+        return None
+    status = status.upper()
+    if status not in VALID_STATUSES:
+        raise InvalidInputError("Status must be APPROVED or REJECTED")
+    return status
+
+
+def list_loans_page(
+    db: Session, user: User, status: str | None, page: int, size: int
+) -> dict:
+    """A page of loans the user may see: officers see all, customers only their own."""
+    status = normalize_status(status)
+    customer_id = None if user.role == UserRole.OFFICER else user.customer_id
+
+    items, total = loan_repositories.list_page(
+        db, customer_id, status, offset=(page - 1) * size, limit=size
+    )
+    total_pages = -(-total // size)  # ceiling division: 25 loans / 10 per page = 3
+    return {
+        "items": items,
+        "page": page,
+        "size": size,
+        "total": total,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_previous": page > 1,
+    }
 
 
 def list_loans_for_customer(
@@ -192,10 +223,7 @@ def list_loans_for_customer(
     if customer is None:
         raise CustomerNotFound(customer_id)
 
-    if status is not None:
-        status = status.upper()
-        if status not in {"APPROVED", "REJECTED"}:
-            raise InvalidInputError("Status must be APPROVED or REJECTED")
+    status = normalize_status(status)
 
     return loan_repositories.list_for_customer(
         db,

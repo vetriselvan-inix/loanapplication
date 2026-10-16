@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from loan_application.db import get_db
@@ -7,7 +7,12 @@ from loan_application.dependencies.auth import (
     get_current_user,
     require_roles,
 )
-from loan_application.schemas.loan_schemas import LoanApplyIn, LoanOut, messageOut
+from loan_application.schemas.loan_schemas import (
+    LoanApplyIn,
+    LoanOut,
+    LoanPage,
+    messageOut,
+)
 from loan_application.services import loan_services
 from loan_application.services.access import ensure_can_access_customer
 from loan_application.tables import User, UserRole
@@ -67,3 +72,19 @@ def list_loans(
 def delete_loan(loan_id: int, db: Session = Depends(get_db)):
     loan_services.delete_loan(db, loan_id)
     return {"message": f"Loan {loan_id} deleted successfully"}
+
+
+api_router = APIRouter(
+    prefix="/api/loans", tags=["Loans"], dependencies=[Depends(authenticated_user)]
+)
+
+
+@api_router.get("", response_model=LoanPage)
+def list_loans_paginated(
+    status: str | None = Query(None, description="APPROVED or REJECTED"),
+    page: int = Query(1, ge=1, description="Page number, starting at 1"),
+    size: int = Query(10, ge=1, le=100, description="Loans per page (max 100)"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return loan_services.list_loans_page(db, user, status, page, size)

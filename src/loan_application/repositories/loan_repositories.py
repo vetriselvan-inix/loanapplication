@@ -22,6 +22,29 @@ def list_for_customer(
     return list(db.scalars(stmt))
 
 
+def list_page(
+    db: Session,
+    customer_id: int | None,
+    status: str | None,
+    offset: int,
+    limit: int,
+) -> tuple[list[Loan], int]:
+    """One page of loans and the total matching count. customer_id=None means all."""
+    stmt = select(Loan)
+    if customer_id is not None:
+        stmt = stmt.where(Loan.customer_id == customer_id)
+    if status is not None:
+        stmt = stmt.where(Loan.status == status)
+
+    total = db.scalar(select(func.count()).select_from(stmt.subquery()))
+    items = db.scalars(
+        stmt.order_by(Loan.applied_on.asc(), Loan.id.asc())  # stable oldest-first
+        .offset(offset)
+        .limit(limit)
+    )
+    return list(items), total
+
+
 def summary_for_customer(db: Session, customer_id: int):
     """One query: (total, approved, rejected, approved_amount, approved_emi)."""
     approved = Loan.status == "APPROVED"
