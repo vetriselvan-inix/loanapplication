@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -168,6 +168,53 @@ def test_approve_loan(db_session):
 
     assert updated.status == "APPROVED"
     assert updated.emi is not None
+
+
+def test_approve_loan_refuses_underage_customer(db_session):
+    customer = customer_services.create_customer(
+        db_session, make_customer_data(dob=date(2000, 1, 1))
+    )
+    loan = loan_services.apply_for_loan(db_session, make_loan_data(customer.id))
+    assert loan.status == "APPROVED"
+    # Turn the customer into a minor after the fact, then force the loan back to REJECTED
+    today = datetime.now().astimezone().date()
+    customer.date_of_birth = today.replace(year=today.year - 5)
+    loan_services.patch_loan(db_session, loan.id)
+    db_session.commit()
+
+    with pytest.raises(InvalidInputError, match="Age must be between 21 and 60"):
+        loan_services.approve_loan(db_session, loan.id)
+
+    db_session.refresh(loan)
+    assert loan.status == "REJECTED"
+    assert loan.emi is None
+
+
+def test_approve_loan_refuses_amount_above_income_limit(db_session):
+    customer = create_customer(db_session)  # income 50,000, so the limit is 10,00,000
+    loan = loan_services.apply_for_loan(
+        db_session, make_loan_data(customer.id, amount="1500000")
+    )
+    assert loan.status == "REJECTED"
+
+    with pytest.raises(InvalidInputError, match="exceeds 20x monthly income"):
+        loan_services.approve_loan(db_session, loan.id)
+
+    db_session.refresh(loan)
+    assert loan.status == "REJECTED"
+
+
+def test_approve_loan_allows_eligible_customer_after_admin_reject(db_session):
+    customer = create_customer(db_session)
+    loan = loan_services.apply_for_loan(db_session, make_loan_data(customer.id))
+    loan_services.patch_loan(db_session, loan.id)
+    assert loan.status == "REJECTED"
+
+    updated = loan_services.approve_loan(db_session, loan.id)
+
+    assert updated.status == "APPROVED"
+    assert updated.emi is not None
+    assert updated.rejection_reason is None
 
 
 def test_patch_loan_reject(db_session):

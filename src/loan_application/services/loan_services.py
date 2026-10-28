@@ -140,6 +140,14 @@ def approve_loan(db: Session, loan_id: int) -> Loan:
     if loan.status == "APPROVED":
         return loan
 
+    customer = customer_repositories.get_by_id(db, loan.customer_id)
+    if customer is None:
+        raise CustomerNotFound(loan.customer_id)
+
+    reason = check_eligibility(db, customer, loan.amount)
+    if reason:
+        raise InvalidInputError(f"Cannot approve loan: {reason}")
+
     rate = INTEREST_RATES[loan.tenure_months]
     with transaction(db):
         loan.interest_rate = rate
