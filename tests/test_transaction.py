@@ -108,6 +108,7 @@ def make_customer_row(db):
             phone="9000000001",
             date_of_birth=date(1990, 1, 1),
             monthly_income=Decimal("50000.00"),
+            credit_score=700,
         )
     )
     db.flush()

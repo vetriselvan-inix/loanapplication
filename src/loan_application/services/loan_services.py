@@ -13,7 +13,7 @@ from loan_application.schemas.loan_schemas import LoanApplyIn
 from loan_application.tables import Customer, Loan, User, UserRole
 
 VALID_STATUSES = {"APPROVED", "REJECTED"}
-from loan_application.services import customer_services
+from loan_application.services import credit_score, customer_services
 from loan_application.services.transaction import transaction
 
 INTEREST_RATES = {
@@ -48,6 +48,10 @@ def check_eligibility(db: Session, customer: Customer, amount: Decimal) -> str |
     if loan_repositories.count_approved_for_customer(db, customer.id) >= 2:
         return "Customer already has 2 active loans"
 
+    # Worked out fresh, not read from the stored column, so it is never stale
+    if credit_score.current_score(db, customer) < credit_score.MIN_APPROVAL_SCORE:
+        return f"Credit score must be at least {credit_score.MIN_APPROVAL_SCORE}"
+
     return None
 
 
@@ -79,6 +83,7 @@ def apply_for_loan(db: Session, data: LoanApplyIn) -> Loan:
 
     with transaction(db):
         loan_repositories.add(db, loan)
+        credit_score.refresh_credit_score(db, customer)
     db.refresh(loan)
     return loan
 
@@ -158,6 +163,7 @@ def approve_loan(db: Session, loan_id: int) -> Loan:
         )
         loan.status = "APPROVED"
         loan.rejection_reason = None
+        credit_score.refresh_credit_score(db, customer)
     db.refresh(loan)
     return loan
 
@@ -173,6 +179,9 @@ def patch_loan(db: Session, loan_id: int) -> Loan:
         loan.interest_rate = None
         loan.emi = None
         loan.rejection_reason = "Rejected by administrator"
+        customer = customer_repositories.get_by_id(db, loan.customer_id)
+        if customer is not None:
+            credit_score.refresh_credit_score(db, customer)
     db.refresh(loan)
     return loan
 
@@ -183,8 +192,11 @@ def delete_loan(db: Session, loan_id: int) -> None:
     if loan is None:
         raise NotFoundError("Loan not found")
 
+    customer = customer_repositories.get_by_id(db, loan.customer_id)
     with transaction(db):
         loan_repositories.delete(db, loan)
+        if customer is not None:
+            credit_score.refresh_credit_score(db, customer)
 
 
 def normalize_status(status: str | None) -> str | None:

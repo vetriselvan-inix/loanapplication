@@ -6,7 +6,8 @@ from loan_application.exceptions import (
     InvalidInputError,
 )
 from loan_application.repositories import customer_repositories
-from loan_application.schemas.customer_schemas import CustomerIn
+from loan_application.schemas.customer_schemas import CustomerIn, CustomerOut
+from loan_application.services import credit_score
 from loan_application.services.transaction import transaction
 from loan_application.tables import Customer
 
@@ -22,6 +23,15 @@ def get_customer(db, customer_id: int):
     return customer
 
 
+def get_customer_with_current_score(db: Session, customer_id: int) -> CustomerOut:
+    """The customer as the API shows it, with the score worked out now instead of the
+    stored one, which can lag (for example after a birthday). Changes nothing."""
+    customer = get_customer(db, customer_id)
+    shown = CustomerOut.model_validate(customer)
+    shown.credit_score = credit_score.current_score(db, customer)
+    return shown
+
+
 def add_customer(db: Session, data: CustomerIn) -> Customer:
     """Stage a new customer in the caller's transaction. Does not commit."""
     customer_data = data.model_dump()
@@ -31,6 +41,7 @@ def add_customer(db: Session, data: CustomerIn) -> Customer:
         raise ConflictError(DUPLICATE_EMAIL)
 
     customer = Customer(**customer_data)
+    credit_score.refresh_credit_score(db, customer)  # no loans yet
     customer_repositories.add(db, customer)
     db.flush()  # send the INSERT so customer.id is available, still uncommitted
     return customer
@@ -52,6 +63,8 @@ def update_customer(db: Session, customer_id: int, data: CustomerIn) -> Customer
     with transaction(db, DUPLICATE_EMAIL):
         for key, value in data.model_dump().items():
             setattr(customer, key, value)
+        # Income or date of birth may have changed
+        credit_score.refresh_credit_score(db, customer)
     db.refresh(customer)
     return customer
 

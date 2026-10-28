@@ -25,6 +25,7 @@ def make_customer(db, **overrides):
         "phone": f"9{n:09d}",
         "date_of_birth": date(1990, 1, 1),
         "monthly_income": Decimal("50000.00"),
+        "credit_score": 700,
     }
     data.update(overrides)
     obj = Customer(**data)
