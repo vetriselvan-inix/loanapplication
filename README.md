@@ -58,6 +58,7 @@ loan_application/
 │   ├── services/               # Business rules
 │   │   ├── auth_services.py    #   login, register, change password
 │   │   ├── customer_services.py
+│   │   ├── credit_score.py     #   credit score formula and recalculation
 │   │   ├── loan_services.py    #   eligibility, interest rate, EMI, summary, pagination
 │   │   ├── access.py           #   "can this user see this customer?"
 │   │   └── transaction.py      #   commit/rollback unit of work
@@ -282,8 +283,24 @@ When a loan is applied for, the rules are checked in order. The first one that f
 1. The customer's age must be between **21 and 60**.
 2. The amount must not exceed **20 × monthly income**.
 3. The customer must have fewer than **2 approved loans**.
+4. The customer's **credit score** must be at least **600**.
 
 If every rule passes, the loan is saved as `APPROVED` with an interest rate and EMI.
+
+`approve_loan` (officer approval of a previously rejected loan) runs the same rules, so a loan cannot be approved for a customer who would be rejected on application.
+
+### Credit score
+
+Every customer has a `credit_score` from 300 to 850. It is calculated by the system and cannot be set through the API; a `credit_score` sent in a request is ignored. It is shown in customer responses.
+
+| Part | Points |
+|---|---|
+| Base | 300 |
+| Income | up to 200: `monthly_income / 1,00,000 × 200`, capped at 200 |
+| Existing EMI burden | up to 250: `250 × (1 − approved EMI / monthly income)`, never below 0 |
+| Age | 100 for ages 25 to 55, 60 for ages 21 to 24 and 56 to 60, otherwise 0 |
+
+Only **approved** loans count towards the EMI burden, so a rejection never lowers a score. The stored score is recalculated when a customer is created or updated, and whenever one of their loans is applied for, approved, rejected or deleted. The eligibility rule and `GET /customers/{id}` work the score out fresh, so they never show a stale value (for example after a birthday moves the customer into a new age band); the stored column is a snapshot. The weights live in `services/credit_score.py`; they are a simple in-house formula, not a credit-bureau model.
 
 ### Interest rate by tenure
 
@@ -319,6 +336,7 @@ EMI = P × r × (1 + r)^n / ((1 + r)^n − 1)
 | `phone` | string | Exactly 10 digits, **unique** |
 | `date_of_birth` | date | `YYYY-MM-DD`, must be in the past |
 | `monthly_income` | decimal | Greater than 0 |
+| `credit_score` | integer | 300 to 850, calculated by the system (see Credit score) |
 
 ### `loans`
 

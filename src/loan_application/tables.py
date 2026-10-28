@@ -28,6 +28,7 @@ class Customer(Base):
     phone: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
     monthly_income: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    credit_score: Mapped[int] = mapped_column(Integer, nullable=False)
 
     @validates("date_of_birth")
     def validate_date_of_birth(self, key, value):
@@ -44,6 +45,9 @@ class Customer(Base):
             "name NOT GLOB '*[^A-Za-z ]*'", name="check_customer_name_letters"
         ),
         CheckConstraint("monthly_income >0", name="check_monthly_income"),
+        CheckConstraint(
+            "credit_score >= 300 AND credit_score <= 850", name="check_credit_score"
+        ),
     )
 
 

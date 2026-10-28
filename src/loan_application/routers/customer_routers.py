@@ -30,7 +30,7 @@ def add_customer(data: CustomerIn, db: Session = Depends(get_db)):
 @router.get("/{customer_id}", response_model=CustomerOut)
 def get_customer(customer_id: int, db: Session = Depends(get_db),user: User = Depends(get_current_user),):
     ensure_can_access_customer(user, customer_id)
-    return customer_services.get_customer(db, customer_id)
+    return customer_services.get_customer_with_current_score(db, customer_id)
 
 
 @router.put("/{customer_id}", response_model=CustomerOut)

@@ -56,6 +56,7 @@ class CustomerIn(BaseModel):
 
 class CustomerOut(CustomerIn):
     id: int
+    credit_score: int  # worked out by the system, never accepted as input
     model_config = ConfigDict(from_attributes=True)
 
 
