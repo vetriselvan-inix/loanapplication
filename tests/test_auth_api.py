@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
-from helpers import PASSWORD, customer_payload, make_loan, make_user
+from helpers import PASSWORD, customer_payload, make_customer, make_loan, make_user
 
 from loan_application.config import settings
 from loan_application.tables import UserRole
@@ -171,3 +171,88 @@ def test_register_short_password_is_400(client):
 
 def test_register_bad_username_is_400(client):
     assert client.post("/auth/register", json=register_body(username="bad name!")).status_code == 400
+
+# ---- change password ----
+NEW_PASSWORD = "NewPass@123"
+
+
+def test_change_password_then_login_with_new(client, db):
+    user = make_user(db, make_customer(db))
+    headers = login_headers_for(client, user.username, PASSWORD)
+
+    r = client.post(
+        "/auth/change-password",
+        json={"old_password": PASSWORD, "new_password": NEW_PASSWORD},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["message"] == "Password changed successfully"
+
+    old = client.post("/auth/login", data={"username": user.username, "password": PASSWORD})
+    assert old.status_code == 401
+
+    new = client.post("/auth/login", data={"username": user.username, "password": NEW_PASSWORD})
+    assert new.status_code == 200
+
+
+def test_change_password_wrong_old_password_is_400(client, db):
+    user = make_user(db, make_customer(db))
+    r = client.post(
+        "/auth/change-password",
+        json={"old_password": "wrong-password", "new_password": NEW_PASSWORD},
+        headers=login_headers_for(client, user.username, PASSWORD),
+    )
+    assert r.status_code == 400
+    assert r.json()["message"] == "Old password is incorrect"
+
+
+def test_change_password_same_as_old_is_400(client, db):
+    user = make_user(db, make_customer(db))
+    r = client.post(
+        "/auth/change-password",
+        json={"old_password": PASSWORD, "new_password": PASSWORD},
+        headers=login_headers_for(client, user.username, PASSWORD),
+    )
+    assert r.status_code == 400
+
+
+def test_change_password_short_new_password_is_400(client, db):
+    user = make_user(db, make_customer(db))
+    r = client.post(
+        "/auth/change-password",
+        json={"old_password": PASSWORD, "new_password": "short"},
+        headers=login_headers_for(client, user.username, PASSWORD),
+    )
+    assert r.status_code == 400
+
+
+def test_change_password_without_token_is_401(client):
+    r = client.post(
+        "/auth/change-password",
+        json={"old_password": PASSWORD, "new_password": NEW_PASSWORD},
+    )
+    assert r.status_code == 401
+
+
+def test_officer_created_customer_can_change_password(client, officer_headers):
+    # officer registers the customer with a temporary password
+    body = customer_payload(username="ravi12", password="Temp@1234")
+    assert client.post("/auth/register", json=body).status_code == 201
+
+    # customer logs in with the temp password and changes it
+    headers = login_headers_for(client, "ravi12", "Temp@1234")
+    r = client.post(
+        "/auth/change-password",
+        json={"old_password": "Temp@1234", "new_password": NEW_PASSWORD},
+        headers=headers,
+    )
+    assert r.status_code == 200
+
+    r = client.post("/auth/login", data={"username": "ravi12", "password": NEW_PASSWORD})
+    assert r.status_code == 200
+
+
+def login_headers_for(client, username, password):
+    r = client.post("/auth/login", data={"username": username, "password": password})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}

@@ -1,0 +1,12 @@
+$kind: http-request
+name: New Request
+url: http://127.0.0.1:8000/api/loans?page=1&size=10
+method: GET
+queryParams:
+  page: "1"
+  size: "10"
+auth:
+  type: bearer
+  credentials:
+    token: ""
+order: 6000

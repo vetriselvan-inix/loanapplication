@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from loan_application.exceptions import ConflictError
+from loan_application.exceptions import ConflictError, InvalidInputError
 from loan_application.repositories import user_repositories
 from loan_application.schemas.customer_schemas import CustomerIn
 from loan_application.security import hash_password, verify_password
@@ -34,3 +34,12 @@ def register_user(db: Session, data) -> tuple[User, int]:
         )
         user_repositories.add(db, user)
     return user, customer.id
+
+def change_password(db: Session, user: User, old_password: str, new_password: str) -> None:
+    if not verify_password(old_password, user.password_hash):
+        raise InvalidInputError("Old password is incorrect")
+    if old_password == new_password:
+        raise InvalidInputError("New password must be different from the old password")
+
+    with transaction(db):
+        user.password_hash = hash_password(new_password)

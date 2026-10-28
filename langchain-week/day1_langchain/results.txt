@@ -1,0 +1,11 @@
+#  name                  amount  months  purpose                     conf    missing
+------------------------------------------------------------------------------------
+1  Ramesh Kumar        500000.0      36  house renovation            high    -
+2  Anita Sharma       1200000.0      60  sister's wedding            high    -
+3  Imran               200000.0      18  shop                        high    -
+4  Priya                   None    None  buying a two-wheeler        low     amount,tenure_months
+5  Suresh             2500000.0      60  Business expansion          high    -
+
+EMPTY INPUT -> error='could not read', confidence=low, missing=['customer_name', 'amount', 'tenure_months', 'purpose']
+
+ALL ASSERTS PASSED
