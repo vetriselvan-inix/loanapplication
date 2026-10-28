@@ -10,3 +10,7 @@ wheels/
 .venv
 
 .env
+
+# LangChain learning workspace
+langchain-week/.env
+langchain-week/checkpoints.db

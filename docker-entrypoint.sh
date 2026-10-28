@@ -1,7 +1,7 @@
 #!/bin/sh
-set -e
+set -e  #stop immediatrely if any step fails
 
-alembic upgrade head
-python -m loan_application.seed
+alembic upgrade head # apply any pending migrations to the postgres
+python -m loan_application.seed  # create the officer user (skipped if already there / not configured
 
-exec "$@"
+exec "$@" # replace the shell with the cmd (uvicorn)
