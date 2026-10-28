@@ -1,0 +1,56 @@
+=== Q1: What is the EMI for 3,00,000 at 10.5% for 24 months?
+  HumanMessage: What is the EMI for 3,00,000 at 10.5% for 24 months?
+  AIMessage -> tool call: emi_calculator({'principal': 300000, 'annual_rate_percent': 10.5, 'months': 24})
+  ToolMessage (emi_calculator): {"emi": 13912.81, "total_payment": 333907.44, "total_interest": 33907.44}
+  AIMessage: The monthly EMI for a loan of ₹3,00,000 at 10.5% interest over 24 months is **₹13,912.81**. The total payment will be ₹3,33,907.44, including ₹33,907.44 in interest.
+ANSWER: The monthly EMI for a loan of ₹3,00,000 at 10.5% interest over 24 months is **₹13,912.81**. The total payment will be ₹3,33,907.44, including ₹33,907.44 in interest.
+
+=== Q2: Is customer 29 eligible for a loan of 5,00,000 for 36 months?
+  HumanMessage: Is customer 29 eligible for a loan of 5,00,000 for 36 months?
+  AIMessage -> tool call: check_eligibility({'customer_id': 29, 'amount': 500000})
+  ToolMessage (check_eligibility): {"customer_id": 29, "amount": 500000.0, "eligible": true, "failed_rules": [], "max_amount_by_income": 1000000.0}
+  AIMessage: Yes, customer 29 is eligible for a loan of ₹5,00,000. The maximum amount they are allowed by their income is ₹10,00,000.
+ANSWER: Yes, customer 29 is eligible for a loan of ₹5,00,000. The maximum amount they are allowed by their income is ₹10,00,000.
+
+=== Q3: Is customer 4 eligible for a loan of 4,00,000 for 24 months?
+  HumanMessage: Is customer 4 eligible for a loan of 4,00,000 for 24 months?
+  AIMessage -> tool call: check_eligibility({'customer_id': 4, 'amount': 400000})
+  ToolMessage (check_eligibility): {"customer_id": 4, "amount": 400000.0, "eligible": false, "failed_rules": ["Age must be between 21 and 60"], "max_amount_by_income": 1000000.0}
+  AIMessage: No, customer 4 is not eligible for a loan of ₹4,00,000. The reason is that their age must be between 21 and 60 years. Their maximum eligible loan amount based on income is ₹10,00,000.
+ANSWER: No, customer 4 is not eligible for a loan of ₹4,00,000. The reason is that their age must be between 21 and 60 years. Their maximum eligible loan amount based on income is ₹10,00,000.
+
+=== Q4: Is customer 999 eligible for a loan of 1,00,000 for 12 months?
+  HumanMessage: Is customer 999 eligible for a loan of 1,00,000 for 12 months?
+  AIMessage -> tool call: check_eligibility({'customer_id': 999, 'amount': 100000})
+  ToolMessage (check_eligibility): Customer 999 was not found.
+  AIMessage: Customer 999 was not found. Please provide a valid customer ID to check eligibility.
+ANSWER: Customer 999 was not found. Please provide a valid customer ID to check eligibility.
+
+=== Q5: What is the capital of France?
+  HumanMessage: What is the capital of France?
+  AIMessage: I can only help with questions about loans, such as eligibility, interest rates, and EMI calculations. I cannot answer general knowledge questions like this one.
+ANSWER: I can only help with questions about loans, such as eligibility, interest rates, and EMI calculations. I cannot answer general knowledge questions like this one.
+
+=== Q6: Can I get a loan?
+  HumanMessage: Can I get a loan?
+  AIMessage: To check your eligibility for a loan, I need to know:
+1. Your customer ID (if you have one)
+2. The loan amount you're interested in
+
+Could you please provide these details?
+ANSWER: To check your eligibility for a loan, I need to know:
+1. Your customer ID (if you have one)
+2. The loan amount you're interested in
+
+Could you please provide these details?
+
+)
+2. The loan amount you're interested in
+
+Could you please provide these details?
+ANSWER: To check your eligibility for a loan, I need to know:
+1. Your customer ID (if you have one)
+2. The loan amount you're interested in
+
+Could you please provide these details?
+
