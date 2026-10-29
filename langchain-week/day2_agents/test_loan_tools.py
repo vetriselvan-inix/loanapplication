@@ -7,6 +7,7 @@ If the data changes, update the numbers here.
 import sys
 from decimal import Decimal
 
+import loan_tools
 from loan_application.repositories import customer_repositories
 from loan_application.services import loan_services
 from loan_application.tables import Customer
@@ -18,6 +19,7 @@ from loan_tools import (
     get_interest_rate,
 )
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -130,12 +132,28 @@ def test_check_eligibility_agrees_with_app():
         for cid in ids:
             customer = customer_repositories.get_by_id(db, cid)
             for amount in (10000, 500000, 5000000):
-                app_reason = loan_services.check_eligibility(db, customer, Decimal(amount))
+                app_reason = loan_services.check_eligibility(db, customer, Decimal(amount)) # pyright: ignore[reportArgumentType]
                 ours = check_eligibility.invoke({"customer_id": cid, "amount": amount})
                 expected = [app_reason] if app_reason else []
                 assert ours["failed_rules"][:1] == expected, (cid, amount, ours, app_reason)
                 assert ours["eligible"] == (app_reason is None)
     print(f"agrees with the app for {len(ids)} customers x 3 amounts")
+
+
+def test_database_down_gives_a_message_not_a_crash():
+    def unreachable():
+        raise OperationalError("SELECT 1", {}, Exception("connection timeout expired"))
+
+    real = loan_tools._session
+    loan_tools._session = unreachable
+    try:
+        a = get_customer.invoke({"customer_id": 29})
+        b = check_eligibility.invoke({"customer_id": 29, "amount": 500000})
+    finally:
+        loan_tools._session = real
+    print("get_customer:", a)
+    print("check_eligibility:", b)
+    assert a == b == loan_tools.DATABASE_DOWN
 
 
 def test_get_interest_rate_valid_tenures():

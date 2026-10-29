@@ -17,6 +17,8 @@ I got there in small steps:
 
 The database connection is opened in Postgres read-only mode. I proved that a write is refused.
 
+**Added on Day 3:** the same agent now also has `search_policy` (answers from the loan policy document) and `percent_of` (works out fees like the processing fee), and its system prompt was rewritten as a short "for this kind of question, use this tool" list. The six results and `traces.txt` below were recorded before that change, so they describe the original four-tool agent. The two customer tools now also return a friendly message if the database is down, instead of crashing. See `day3_rag/README.md`.
+
 ## How to run
 
 Make sure Ollama and the database are running, then:
