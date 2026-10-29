@@ -4,6 +4,7 @@ The connection is opened in Postgres read-only mode, so nothing here can change 
 Rules and calculations come from the app's own code, so the answers match the app.
 """
 
+import functools
 import os
 from datetime import datetime
 from decimal import Decimal
@@ -14,6 +15,7 @@ from langchain.tools import tool
 from loan_application.repositories import customer_repositories, loan_repositories
 from loan_application.services import credit_score, loan_services
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -32,7 +34,24 @@ def _number(value: Decimal) -> float:
     return float(value)
 
 
+DATABASE_DOWN = "I cannot reach the loan database right now. Please make sure it is running and try again."
+
+
+def _handles_database_down(func):
+    """Return a friendly message instead of crashing the agent when the database is unreachable."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except OperationalError:
+            return DATABASE_DOWN
+
+    return wrapper
+
+
 @tool
+@_handles_database_down
 def get_customer(customer_id: int) -> dict | str:
     """Look up one customer of the loan application by their numeric customer id.
     Returns the customer's name, age, monthly income in rupees, existing monthly EMI
@@ -84,6 +103,7 @@ def emi_calculator(principal: float, annual_rate_percent: float, months: int) ->
 
 
 @tool
+@_handles_database_down
 def check_eligibility(customer_id: int, amount: float) -> dict | str:
     """Check whether a customer is eligible for a loan of the given amount in rupees.
     Checks every rule: age between 21 and 60, amount at most 20 times monthly income,

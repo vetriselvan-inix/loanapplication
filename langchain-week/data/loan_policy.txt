@@ -1,18 +1,18 @@
-LOAN POLICY (SAMPLE) Version 1.0
+LOAN POLICY (SAMPLE) Version 1.1, aligned with the loan application
 
 Section 1: Eligibility
 1.1 Applicants must be between 21 and 60 years of age at the time of application.
-1.2 Salaried applicants need a minimum monthly income of Rs 25,000. Self-employed applicants need a minimum annual income of Rs 4,00,000.
-1.3 A credit score of 700 or above is required. Scores between 650 and 699 are referred to a credit officer.
-1.4 Total monthly EMIs including the new loan must not exceed 50 percent of monthly income.
+1.2 The loan amount must not exceed 20 times the applicant's monthly income.
+1.3 A credit score of 600 or above is required. The credit score ranges from 300 to 850. It is calculated by the system from the applicant's income, existing EMI burden and age, and cannot be entered by the applicant.
+1.4 An applicant may have at most 2 active loans. An applicant who already has 2 active loans is not eligible for another.
 
 Section 2: Loan amounts and tenure
-2.1 Personal loans range from Rs 50,000 to Rs 15,00,000.
-2.2 Tenure ranges from 12 to 60 months.
+2.1 Personal loans range from Rs 10,000 to Rs 50,00,000.
+2.2 Tenure is 12, 24, 36, 48 or 60 months.
 2.3 Loans above Rs 10,00,000 require senior manager approval.
 
 Section 3: Interest and charges
-3.1 Interest rates range from 10.5 percent to 16 percent per year, based on credit score.
+3.1 The interest rate depends on the tenure: 10 percent per year for 12 months, 11 percent for 24 months, 12 percent for 36 months, 13 percent for 48 months and 13 percent for 60 months.
 3.2 Processing fee is 1.5 percent of the loan amount plus applicable taxes.
 3.3 Prepayment is allowed after 6 months. A charge of 2 percent applies to the outstanding principal if prepaid within 12 months.
 3.4 A late payment fee of 2 percent per month applies to overdue EMI amounts.

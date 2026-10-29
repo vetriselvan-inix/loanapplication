@@ -1,7 +1,8 @@
 """Day 2 assignment: a read-only loan assistant that uses the loan app's real data.
 
 It can look up a customer, check eligibility, quote the interest rate and calculate an
-EMI. It cannot apply for, approve or change anything.
+EMI. Since Day 3 it can also answer from the loan policy document (search_policy) and work
+out percentage fees (percent_of). It cannot apply for, approve or change anything.
 
 Chat:  uv run python day2_agents\\loan_agent.py
 Demo:  uv run python day2_agents\\loan_agent.py --demo   (six fixed questions, saved to traces.txt)
@@ -15,18 +16,28 @@ from langchain.agents import create_agent
 from langchain_ollama import ChatOllama
 from loan_tools import check_eligibility, emi_calculator, get_customer, get_interest_rate
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "day3_rag"))
+from policy_tools import percent_of, search_policy  # noqa: E402  (Day 3 tools; builds the policy index on import)
+
 sys.stdout.reconfigure(encoding="utf-8")  # the Windows console cannot print the rupee sign otherwise
 
-SYSTEM_PROMPT = """You are a careful assistant for a loan application. You only answer questions about loans: eligibility, interest rates and EMI.
+SYSTEM_PROMPT = """You are an assistant for a loan application. You only help with loans: eligibility, interest rates, EMI and what the loan policy says. Amounts are in rupees. Keep answers short.
+
+Choose the tool by the kind of question:
+- The user gives an amount, a tenure and a rate and wants the EMI: call emi_calculator at once. Do not ask for a customer id.
+- The user gives a tenure but no rate: call get_interest_rate, then use that rate.
+- A fee, charge, document, prepayment, disbursal or any other rule of the policy: call search_policy and answer only from the text it returns. Cite the section number that appears in that text, like [3.2]. Never cite a section that is not in the returned text.
+- A fee that is a percentage of an amount, such as the processing fee on a loan amount: call search_policy for the percentage, then call percent_of with that percentage and the amount. Give the rupee amount, and repeat any condition such as "plus applicable taxes".
+- A question about one specific customer (eligibility, income, existing loans, credit score): call get_customer and check_eligibility. Ask for a customer id only when the question is about a customer and none is given.
+- A question with several parts: call every tool it needs.
+
 Rules:
-- Use the tools for every number, rate, EMI and eligibility answer. Never guess or calculate yourself.
-- If the user gives a tenure but no interest rate, call get_interest_rate with the tenure and use that rate.
-- If a customer id, amount or tenure is missing, ask the user for it. Never invent one.
-- If a tool returns a message saying something was not found or is invalid, tell the user that plainly.
-- The credit score is calculated by the system from income, existing EMI and age, from 300 to 850, and a customer needs at least 600. Report the score and failed rules from the tools; never make up a score.
-- You cannot apply for, approve or change a loan. If asked to, explain that you can only check and explain.
-- If the question is not about loans, say politely that you can only help with loan questions.
-- Amounts are in rupees. Keep answers short."""
+- Never calculate or guess a number yourself.
+- Never say the policy lacks something unless you have called search_policy first. If it really does, say: I could not find this in the policy.
+- If a tool says something was not found or is invalid, tell the user plainly.
+- The credit score (300 to 850) is calculated by the system and at least 600 is needed. Report the score from the tools and never make one up.
+- You cannot apply for, approve or change a loan. You can only check and explain.
+- If the question is not about loans, say politely that you can only help with loan questions."""
 
 model = ChatOllama(
     model=os.environ.get("OLLAMA_MODEL", "qwen3.5:9b"),
@@ -36,7 +47,14 @@ model = ChatOllama(
 
 agent = create_agent(
     model=model,
-    tools=[get_customer, check_eligibility, get_interest_rate, emi_calculator],
+    tools=[
+        get_customer,
+        check_eligibility,
+        get_interest_rate,
+        emi_calculator,
+        search_policy,
+        percent_of,
+    ],
     system_prompt=SYSTEM_PROMPT,
 )
 

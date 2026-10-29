@@ -1,0 +1,4 @@
+{
+  "extraPaths": ["langchain-week/day2_agents", "langchain-week/day3_rag"],
+  "reportAttributeAccessIssue": "none"
+}
