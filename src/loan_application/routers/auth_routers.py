@@ -6,6 +6,7 @@ from loan_application.db import get_db
 from loan_application.dependencies.auth import get_current_user
 from loan_application.schemas.auth_schemas import (
     ChangePasswordIn,
+    MeOut,
     RegisterIn,
     RegisterOut,
     TokenResponse,
@@ -32,6 +33,14 @@ def login(
     return TokenResponse(access_token=create_access_token(user.id, user.role.value))
 
 
+
+
+@router.get("/me", response_model=MeOut)
+def me(user: User = Depends(get_current_user)):
+    """Who the token belongs to: username, role, and the customer id for customer logins."""
+    return MeOut(
+        username=user.username, role=user.role.value, customer_id=user.customer_id
+    )
 
 
 @router.post("/register", response_model=RegisterOut, status_code=201)

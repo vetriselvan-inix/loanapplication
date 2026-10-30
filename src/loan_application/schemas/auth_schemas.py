@@ -12,6 +12,12 @@ class RegisterIn(CustomerIn):
     password: str = Field(min_length=8, max_length=128)
 
 
+class MeOut(BaseModel):
+    username: str
+    role: str
+    customer_id: int | None
+
+
 class RegisterOut(BaseModel):
     username: str
     customer_id: int

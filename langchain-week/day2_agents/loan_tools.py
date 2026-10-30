@@ -13,6 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain.tools import tool
 from loan_application.repositories import customer_repositories, loan_repositories
+from calc_tools import compare_tenures, emi_calculator, get_interest_rate, tenure_rows  # noqa: F401  (re-exported)
 from loan_application.services import credit_score, loan_services
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
@@ -56,7 +57,8 @@ def get_customer(customer_id: int) -> dict | str:
     """Look up one customer of the loan application by their numeric customer id.
     Returns the customer's name, age, monthly income in rupees, existing monthly EMI
     in rupees (sum of their approved loans), number of approved loans, risk band and
-    credit score (300 to 850, calculated by the system).
+    credit score (300 to 850, calculated by the system) together with how that score is
+    made up: base 300 plus income points, EMI points and age points.
     Returns a short message if the id is invalid or the customer does not exist."""
     if customer_id <= 0:
         return "Customer id must be a positive whole number, for example 29."
@@ -66,6 +68,8 @@ def get_customer(customer_id: int) -> dict | str:
             return f"Customer {customer_id} was not found."
         summary = loan_services.get_customer_summary(db, customer_id)
         today = datetime.now().astimezone().date()
+        # Worked out now, like check_eligibility, so the two tools never disagree
+        score = credit_score.current_breakdown(db, customer)
         return {
             "customer_id": customer.id,
             "name": customer.name,
@@ -74,32 +78,16 @@ def get_customer(customer_id: int) -> dict | str:
             "existing_monthly_emi": _number(summary["total_monthly_emi"]),
             "approved_loans": summary["approved_count"],
             "risk_band": summary["risk_band"],
-            # Worked out now, like check_eligibility, so the two tools never disagree
-            "credit_score": credit_score.current_score(db, customer),
+            "credit_score": score["score"],
+            "credit_score_breakdown": {
+                "base": score["base"],
+                "income_points": score["income_points"],
+                "emi_points": score["emi_points"],
+                "age_points": score["age_points"],
+                "emi_percent_of_income": score["emi_percent_of_income"],
+                "minimum_required": score["minimum_required"],
+            },
         }
-
-
-@tool
-def emi_calculator(principal: float, annual_rate_percent: float, months: int) -> dict | str:
-    """Calculate the monthly EMI of a loan. principal is the loan amount in rupees,
-    annual_rate_percent is the yearly interest rate in percent (for example 12 for 12%),
-    months is the tenure in months. Returns the EMI, total payment and total interest
-    in rupees. Returns a short message if any input is zero, negative or unreasonable."""
-    if principal <= 0:
-        return "Loan amount must be greater than zero."
-    if annual_rate_percent <= 0 or annual_rate_percent > 100:
-        return "Interest rate must be above 0 and at most 100 percent per year."
-    if months <= 0:
-        return "Tenure must be a positive number of months."
-    emi = loan_services.calculate_emi(
-        Decimal(str(principal)), Decimal(str(annual_rate_percent)), months
-    )
-    total = emi * months
-    return {
-        "emi": _number(emi),
-        "total_payment": _number(total),
-        "total_interest": _number(total - Decimal(str(principal))),
-    }
 
 
 @tool
@@ -144,14 +132,3 @@ def check_eligibility(customer_id: int, amount: float) -> dict | str:
             "failed_rules": reasons,
             "max_amount_by_income": _number(limit),
         }
-
-
-@tool
-def get_interest_rate(tenure_months: int) -> str:
-    """Return the annual interest rate in percent that the loan application charges
-    for a loan tenure given in months. Valid tenures are 12, 24, 36, 48 and 60.
-    Returns a short message if the tenure is not one of those."""
-    rate = loan_services.INTEREST_RATES.get(tenure_months)
-    if rate is None:
-        return "Tenure must be 12, 24, 36, 48 or 60 months."
-    return f"{rate}% per year for {tenure_months} months."

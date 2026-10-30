@@ -32,6 +32,12 @@ def get_customer_with_current_score(db: Session, customer_id: int) -> CustomerOu
     return shown
 
 
+def get_credit_score_breakdown(db: Session, customer_id: int) -> dict:
+    """Where the customer's current credit score comes from. Changes nothing."""
+    customer = get_customer(db, customer_id)
+    return {"customer_id": customer.id, **credit_score.current_breakdown(db, customer)}
+
+
 def add_customer(db: Session, data: CustomerIn) -> Customer:
     """Stage a new customer in the caller's transaction. Does not commit."""
     customer_data = data.model_dump()
