@@ -14,6 +14,7 @@ from loan_application.tables import Customer
 from loan_tools import (
     _session,
     check_eligibility,
+    compare_tenures,
     emi_calculator,
     get_customer,
     get_interest_rate,
@@ -33,6 +34,15 @@ def test_get_customer_found():
     assert c["approved_loans"] == 0
     assert c["credit_score"] == 710
     assert "email" not in c and "phone" not in c and "date_of_birth" not in c
+
+
+def test_get_customer_explains_the_credit_score():
+    c = get_customer.invoke({"customer_id": 29})
+    b = c["credit_score_breakdown"]
+    print("breakdown 29:", b)
+    assert (b["base"], b["income_points"], b["emi_points"], b["age_points"]) == (300, 100.0, 250.0, 60.0)
+    assert b["minimum_required"] == 600
+    assert b["base"] + b["income_points"] + b["emi_points"] + b["age_points"] == c["credit_score"]
 
 
 def test_get_customer_with_two_approved_loans():
@@ -154,6 +164,32 @@ def test_database_down_gives_a_message_not_a_crash():
     print("get_customer:", a)
     print("check_eligibility:", b)
     assert a == b == loan_tools.DATABASE_DOWN
+
+
+def test_compare_tenures_matches_the_app():
+    out = compare_tenures.invoke({"amount": 300000, "monthly_income": 50000})
+    rows = {r["tenure_months"]: r for r in out["options"]}
+    assert list(rows) == [12, 24, 36, 48, 60]
+    # 3,00,000 at 12% for 36 months is the app's own test figure
+    assert rows[36]["annual_rate_percent"] == 12
+    assert rows[36]["emi"] == 9964.29
+    assert rows[36]["emi_percent_of_income"] == 19.9
+    # a longer tenure means a smaller EMI but more interest paid in all
+    emis = [rows[m]["emi"] for m in rows]
+    interest = [rows[m]["total_interest"] for m in rows]
+    assert emis == sorted(emis, reverse=True)
+    assert interest == sorted(interest)
+
+
+def test_compare_tenures_without_income_has_no_percent():
+    out = compare_tenures.invoke({"amount": 300000})
+    assert all("emi_percent_of_income" not in r for r in out["options"])
+
+
+def test_compare_tenures_bad_input_gives_a_message():
+    assert "between Rs 10,000" in compare_tenures.invoke({"amount": 5000})
+    assert "between Rs 10,000" in compare_tenures.invoke({"amount": 6_000_000})
+    assert "greater than zero" in compare_tenures.invoke({"amount": 300000, "monthly_income": 0})
 
 
 def test_get_interest_rate_valid_tenures():

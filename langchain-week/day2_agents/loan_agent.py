@@ -1,40 +1,57 @@
-"""Day 2 assignment: a read-only loan assistant that uses the loan app's real data.
+"""The loan assistant. You log in first, and it only shows what your login is allowed to see.
 
-It can look up a customer, check eligibility, quote the interest rate and calculate an
-EMI. Since Day 3 it can also answer from the loan policy document (search_policy) and work
-out percentage fees (percent_of). It cannot apply for, approve or change anything.
+A customer can ask about their own account; an officer can ask about any customer. The
+checks happen in code and in the loan application itself, not in the prompt, so the model
+cannot be talked out of them. Everything about customers goes through the app's API with
+your token; the assistant never reads the database. It cannot apply for, approve or
+change anything.
 
 Chat:  uv run python day2_agents\\loan_agent.py
-Demo:  uv run python day2_agents\\loan_agent.py --demo   (six fixed questions, saved to traces.txt)
+Demo:  uv run python day2_agents\\loan_agent.py --demo   (six fixed questions, needs an OFFICER login,
+       saved to traces_login.txt; the original Day 2 record in traces.txt is left alone)
+
+For scripted runs, set LOAN_USER and LOAN_PASSWORD in your shell instead of typing them.
 """
 
 import os
 import sys
 from pathlib import Path
 
+from api_tools import make_api_tools
+from app_client import (
+    AppError,
+    AppSession,
+    login_from_environment,
+    prompt_login,
+)
+from calc_tools import compare_tenures, emi_calculator, get_interest_rate
 from langchain.agents import create_agent
 from langchain_ollama import ChatOllama
-from loan_tools import check_eligibility, emi_calculator, get_customer, get_interest_rate
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "day3_rag"))
 from policy_tools import percent_of, search_policy  # noqa: E402  (Day 3 tools; builds the policy index on import)
 
 sys.stdout.reconfigure(encoding="utf-8")  # the Windows console cannot print the rupee sign otherwise
 
-SYSTEM_PROMPT = """You are an assistant for a loan application. You only help with loans: eligibility, interest rates, EMI and what the loan policy says. Amounts are in rupees. Keep answers short.
+BASE_PROMPT = """You are an assistant for a loan application. You only help with loans: eligibility, interest rates, EMI and what the loan policy says. Amounts are in rupees. Keep answers short.
+
+{who}
 
 Choose the tool by the kind of question:
 - The user gives an amount, a tenure and a rate and wants the EMI: call emi_calculator at once. Do not ask for a customer id.
 - The user gives a tenure but no rate: call get_interest_rate, then use that rate.
+- The user wants tenures compared, or asks which tenure to choose, for an amount: call compare_tenures with the amount, and with the monthly income if they give it. Present the options side by side.
 - A fee, charge, document, prepayment, disbursal or any other rule of the policy: call search_policy and answer only from the text it returns. Cite the section number that appears in that text, like [3.2]. Never cite a section that is not in the returned text.
 - A fee that is a percentage of an amount, such as the processing fee on a loan amount: call search_policy for the percentage, then call percent_of with that percentage and the amount. Give the rupee amount, and repeat any condition such as "plus applicable taxes".
-- A question about one specific customer (eligibility, income, existing loans, credit score): call get_customer and check_eligibility. Ask for a customer id only when the question is about a customer and none is given.
+- A question about a customer (eligibility, income, existing loans, credit score): call get_customer and check_eligibility.
+- A question about why a customer has a certain credit score: call get_customer and explain the score from its credit_score_breakdown (base 300, income points, EMI points, age points). Use the numbers it returns and do not work them out yourself.
+- When a customer is not eligible, explain the advice that check_eligibility returns: what could change the outcome, and what cannot.
 - A question with several parts: call every tool it needs.
 
 Rules:
 - Never calculate or guess a number yourself.
 - Never say the policy lacks something unless you have called search_policy first. If it really does, say: I could not find this in the policy.
-- If a tool says something was not found or is invalid, tell the user plainly.
+- If a tool says something was not found, not allowed or invalid, tell the user plainly. Never try to get around a refusal.
 - The credit score (300 to 850) is calculated by the system and at least 600 is needed. Report the score from the tools and never make one up.
 - You cannot apply for, approve or change a loan. You can only check and explain.
 - If the question is not about loans, say politely that you can only help with loan questions."""
@@ -45,19 +62,6 @@ model = ChatOllama(
     temperature=0,
 )
 
-agent = create_agent(
-    model=model,
-    tools=[
-        get_customer,
-        check_eligibility,
-        get_interest_rate,
-        emi_calculator,
-        search_policy,
-        percent_of,
-    ],
-    system_prompt=SYSTEM_PROMPT,
-)
-
 QUESTIONS = [
     "What is the EMI for 3,00,000 at 10.5% for 24 months?",
     "Is customer 29 eligible for a loan of 5,00,000 for 36 months?",
@@ -66,6 +70,40 @@ QUESTIONS = [
     "What is the capital of France?",
     "Can I get a loan?",
 ]
+
+
+def system_prompt(session: AppSession) -> str:
+    """The prompt tells the model who it is talking to. The real limits are enforced in code."""
+    if session.is_officer:
+        who = (
+            f"The user is logged in as an OFFICER ({session.username}). They may ask about any "
+            "customer. For a question about a customer, ask for the customer id if they have "
+            "not given one."
+        )
+    else:
+        who = (
+            f"The user is logged in as a CUSTOMER (customer {session.customer_id}). 'I', 'me' "
+            f"and 'my' mean customer {session.customer_id}, so never ask for a customer id and "
+            "do not pass one to the customer tools. They can only see their own account. If they "
+            "ask about another customer, say you can only help with their own account."
+        )
+    return BASE_PROMPT.format(who=who)
+
+
+def build_agent(session: AppSession):
+    """An agent whose customer tools are tied to this one login."""
+    return create_agent(
+        model=model,
+        tools=[
+            *make_api_tools(session),
+            get_interest_rate,
+            emi_calculator,
+            compare_tenures,
+            search_policy,
+            percent_of,
+        ],
+        system_prompt=system_prompt(session),
+    )
 
 
 def show(messages, out):
@@ -82,9 +120,35 @@ def show(messages, out):
             out(f"  {kind}: {m.content}")
 
 
+def log_in(session: AppSession) -> bool:
+    """Log in from LOAN_USER and LOAN_PASSWORD if both are set, otherwise ask."""
+    try:
+        if login_from_environment(session):
+            return True
+    except AppError as problem:
+        print(problem)
+        return False
+    return prompt_login(session)
+
+
+def describe(session: AppSession) -> None:
+    scope = (
+        "any customer"
+        if session.is_officer
+        else f"your own account (customer {session.customer_id})"
+    )
+    print(f"Logged in as {session.username} ({session.role}). You can ask about {scope}.")
+
+
 def chat():
     """Talk to the agent in the terminal. The whole conversation is sent each turn, so follow-ups work."""
-    print("Loan assistant (read-only). Type q to quit.\n")
+    session = AppSession()
+    if not log_in(session):
+        print("Could not log in. Goodbye.")
+        return
+    describe(session)
+    print("Type q to quit.\n")
+    agent = build_agent(session)
     history = []
     while True:
         try:
@@ -104,16 +168,32 @@ def chat():
             for call in getattr(m, "tool_calls", None) or []:
                 print(f"  [tool] {call['name']}({call['args']})")
         print(f"Assistant: {history[-1].content}\n")
+        if not session.logged_in:  # the token ran out during that turn
+            print("Your login has expired. Please log in again.")
+            history = []  # one user's conversation is never carried into the next login
+            if not prompt_login(session):
+                break
+            describe(session)
+            agent = build_agent(session)
 
 
 def main():
-    path = Path(__file__).resolve().parent / "traces.txt"
+    session = AppSession()
+    if not log_in(session):
+        print("Could not log in. Goodbye.")
+        return
+    if not session.is_officer:
+        print("The demo asks about several customers, so it needs an OFFICER login.")
+        return
+    agent = build_agent(session)
+    path = Path(__file__).resolve().parent / "traces_login.txt"
     with path.open("w", encoding="utf-8") as f:
 
         def out(line=""):
             print(line, flush=True)
             f.write(line + "\n")
 
+        out(f"Logged in as {session.username} ({session.role})\n")
         for i, question in enumerate(QUESTIONS, 1):
             out(f"=== Q{i}: {question}")
             result = agent.invoke({"messages": [{"role": "user", "content": question}]})
