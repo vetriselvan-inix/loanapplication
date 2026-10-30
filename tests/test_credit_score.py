@@ -2,13 +2,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from helpers import customer_payload, make_customer, make_loan
+from helpers import customer_payload, login_headers, make_customer, make_loan, make_user
 
 from loan_application.exceptions import InvalidInputError
 from loan_application.schemas.customer_schemas import CustomerIn
 from loan_application.schemas.loan_schemas import LoanApplyIn
 from loan_application.services import customer_services, loan_services
-from loan_application.services.credit_score import compute_credit_score
+from loan_application.services.credit_score import compute_credit_score, score_breakdown
 
 
 def test_score_for_young_customer_with_no_loans():
@@ -161,3 +161,88 @@ def test_get_customer_shows_the_current_score_not_a_stale_stored_one(
     assert r.json()["credit_score"] == 750
     db_session.refresh(customer)
     assert customer.credit_score == 400  # reading did not write anything
+
+
+# ---------- the score breakdown ----------
+def test_breakdown_for_customer_29():
+    b = score_breakdown(Decimal(50000), 22, Decimal(0))
+    assert b["score"] == 710
+    assert (b["base"], b["income_points"], b["emi_points"], b["age_points"]) == (
+        300,
+        100.0,
+        250.0,
+        60.0,
+    )
+    assert b["emi_percent_of_income"] == 0.0
+    assert b["meets_minimum"] is True
+
+
+def test_breakdown_for_customer_11():
+    # 300 + 72 + 174.7 + 60 = 606.7, rounded to 607
+    b = score_breakdown(Decimal(36000), 24, Decimal("10843.45"))
+    assert b["score"] == 607
+    assert (b["income_points"], b["emi_points"], b["age_points"]) == (72.0, 174.7, 60.0)
+    assert b["emi_percent_of_income"] == 30.1
+    assert b["meets_minimum"] is True
+
+
+def test_breakdown_below_the_minimum():
+    b = score_breakdown(Decimal(50000), 24, Decimal("88795.05"))
+    assert b["score"] == 460
+    assert b["emi_points"] == 0.0
+    # the EMI is 177.6% of income: the points stop at 0, but the share shown is the real one
+    assert b["emi_percent_of_income"] == 177.6
+    assert b["meets_minimum"] is False
+    assert b["minimum_required"] == 600
+
+
+def test_breakdown_score_always_equals_compute_credit_score():
+    for income, age, emi in [
+        (50000, 30, 0),
+        (9000, 18, 0),
+        (25000, 58, 5000),
+        (120000, 40, 90000),
+    ]:
+        b = score_breakdown(Decimal(income), age, Decimal(emi))
+        assert b["score"] == compute_credit_score(Decimal(income), age, Decimal(emi))
+        # the shown parts add up to the score within rounding
+        parts = b["base"] + b["income_points"] + b["emi_points"] + b["age_points"]
+        assert abs(parts - b["score"]) <= 0.5 or b["score"] in (300, 850)
+
+
+# ---------- the breakdown endpoint ----------
+def test_officer_can_read_any_customers_breakdown(client, db_session, officer_headers):
+    customer = make_customer(db_session)
+
+    r = client.get(f"/customers/{customer.id}/credit-score", headers=officer_headers)
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["customer_id"] == customer.id
+    assert body["score"] == 750
+    assert body["income_points"] == 100.0
+    assert body["emi_points"] == 250.0
+    assert body["age_points"] == 100.0
+    assert body["meets_minimum"] is True
+
+
+def test_customer_can_read_only_their_own_breakdown(client, db_session):
+    mine = make_customer(db_session)
+    other = make_customer(db_session)
+    headers = login_headers(client, make_user(db_session, mine).username)
+
+    own = client.get(f"/customers/{mine.id}/credit-score", headers=headers)
+    theirs = client.get(f"/customers/{other.id}/credit-score", headers=headers)
+
+    assert own.status_code == 200, own.text
+    assert theirs.status_code == 403
+
+
+def test_breakdown_needs_login_and_a_real_customer(client, db_session, officer_headers):
+    customer = make_customer(db_session)
+
+    assert client.get(f"/customers/{customer.id}/credit-score").status_code == 401
+    assert (
+        client.get("/customers/999/credit-score", headers=officer_headers).status_code
+        == 404
+    )

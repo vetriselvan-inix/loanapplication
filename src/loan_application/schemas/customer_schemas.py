@@ -72,5 +72,45 @@ class CustomerSummaryOut(BaseModel):
     risk_band: Literal["LOW", "MEDIUM", "HIGH"]
 
 
+class CreditScoreOut(BaseModel):
+    customer_id: int
+    score: int
+    base: int
+    income_points: float
+    emi_points: float
+    age_points: float
+    existing_emi: float
+    emi_percent_of_income: float
+    minimum_required: int
+    meets_minimum: bool
+
+
+class AdviceOut(BaseModel):
+    rule: str
+    fixable: bool
+    suggestion: str
+
+
+class ProjectionOut(BaseModel):
+    tenure_months: int
+    annual_rate_percent: float
+    new_emi: float
+    total_emi_after: float
+    score_after_loan: int
+    stays_above_minimum: bool
+
+
+class EligibilityOut(BaseModel):
+    customer_id: int
+    amount: float
+    eligible: bool
+    failed_rules: list[str]
+    credit_score: int
+    minimum_score: int
+    max_amount_by_income: float
+    advice: list[AdviceOut]
+    projection: ProjectionOut | None = None
+
+
 class MessageOut(BaseModel):
     message: str

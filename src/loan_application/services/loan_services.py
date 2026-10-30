@@ -36,23 +36,41 @@ def calculate_emi(principal: Decimal, annual_rate: Decimal, months: int) -> Deci
     return emi.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def check_eligibility(db: Session, customer: Customer, amount: Decimal) -> str | None:
-    """Return the rejection reason of the first failed rule, or None if eligible."""
+MIN_AGE = 21
+MAX_AGE = 60
+INCOME_MULTIPLE = 20  # the amount may be at most this many times the monthly income
+MAX_ACTIVE_LOANS = 2
+
+AGE_REASON = f"Age must be between {MIN_AGE} and {MAX_AGE}"
+INCOME_REASON = f"Requested amount exceeds {INCOME_MULTIPLE}x monthly income"
+LOANS_REASON = f"Customer already has {MAX_ACTIVE_LOANS} active loans"
+SCORE_REASON = f"Credit score must be at least {credit_score.MIN_APPROVAL_SCORE}"
+
+
+def failed_rules(db: Session, customer: Customer, amount: Decimal) -> list[str]:
+    """Every eligibility rule the request fails, in the order the rules are checked."""
+    failed = []
     age = calculate_age(customer.date_of_birth, datetime.now().astimezone().date())
-    if not (21 <= age <= 60):
-        return "Age must be between 21 and 60"
+    if not (MIN_AGE <= age <= MAX_AGE):
+        failed.append(AGE_REASON)
 
-    if amount > 20 * customer.monthly_income:
-        return "Requested amount exceeds 20x monthly income"
+    if amount > INCOME_MULTIPLE * customer.monthly_income:
+        failed.append(INCOME_REASON)
 
-    if loan_repositories.count_approved_for_customer(db, customer.id) >= 2:
-        return "Customer already has 2 active loans"
+    if loan_repositories.count_approved_for_customer(db, customer.id) >= MAX_ACTIVE_LOANS:
+        failed.append(LOANS_REASON)
 
     # Worked out fresh, not read from the stored column, so it is never stale
     if credit_score.current_score(db, customer) < credit_score.MIN_APPROVAL_SCORE:
-        return f"Credit score must be at least {credit_score.MIN_APPROVAL_SCORE}"
+        failed.append(SCORE_REASON)
 
-    return None
+    return failed
+
+
+def check_eligibility(db: Session, customer: Customer, amount: Decimal) -> str | None:
+    """Return the rejection reason of the first failed rule, or None if eligible."""
+    failed = failed_rules(db, customer, amount)
+    return failed[0] if failed else None
 
 
 def apply_for_loan(db: Session, data: LoanApplyIn) -> Loan:
@@ -114,7 +132,7 @@ def get_customer_summary(db: Session, customer_id: int) -> dict:
         loan_repositories.summary_for_customer(db, customer_id)
     )
     approved_amount = Decimal(approved_amount)
-    approved_emi = Decimal(approved_emi)
+    approved_emi = Decimal(approved_emi or 0)
 
     if customer.monthly_income > 0:
         ratio = (approved_emi / customer.monthly_income * 100).quantize(
