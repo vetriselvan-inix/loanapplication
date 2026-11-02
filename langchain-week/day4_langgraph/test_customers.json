@@ -1,0 +1,8 @@
+{
+  "approve": 32,
+  "refer_amount": 33,
+  "reject_burden": 34,
+  "approve_score_650": 35,
+  "reject_score": 36,
+  "refer_low_score": 37
+}

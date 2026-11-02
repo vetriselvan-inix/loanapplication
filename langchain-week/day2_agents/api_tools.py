@@ -21,20 +21,25 @@ def _age(date_of_birth: str) -> int:
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
+def resolve_customer(session: AppSession, customer_id: int | None) -> int:
+    """The customer id to ask the app about, or an AppError saying why the user may not."""
+    if not session.logged_in:
+        raise AppError("Please log in first.")
+    if session.role == "CUSTOMER":
+        own = session.customer_id
+        if own is not None and customer_id in (None, own):
+            return own
+        raise AppError(OWN_ACCOUNT_ONLY)  # the app would also refuse; no request is sent
+    if customer_id is None:
+        raise AppError("Please tell me which customer id.")
+    if customer_id <= 0:
+        raise AppError("Customer id must be a positive whole number, for example 29.")
+    return customer_id
+
+
 def make_api_tools(session: AppSession) -> list:
     def resolve(customer_id: int | None) -> int:
-        """The customer id to ask the app about, or an AppError saying why the user may not."""
-        if not session.logged_in:
-            raise AppError("Please log in first.")
-        if session.role == "CUSTOMER":
-            if customer_id in (None, session.customer_id):
-                return session.customer_id
-            raise AppError(OWN_ACCOUNT_ONLY)  # the app would also refuse; no request is sent
-        if customer_id is None:
-            raise AppError("Please tell me which customer id.")
-        if customer_id <= 0:
-            raise AppError("Customer id must be a positive whole number, for example 29.")
-        return customer_id
+        return resolve_customer(session, customer_id)
 
     @tool
     def get_customer(customer_id: int | None = None) -> dict | str:

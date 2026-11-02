@@ -1,4 +1,4 @@
 {
-  "extraPaths": ["langchain-week/day2_agents", "langchain-week/day3_rag"],
+  "extraPaths": ["langchain-week/day1_langchain", "langchain-week/day2_agents", "langchain-week/day3_rag", "langchain-week/day4_langgraph"],
   "reportAttributeAccessIssue": "none"
 }
