@@ -12,6 +12,9 @@ from loan_application.services.transaction import transaction
 from loan_application.tables import Customer
 
 DUPLICATE_EMAIL = "Customer with this email already exists"
+DUPLICATE_PHONE = "Customer with this phone number already exists"
+# For a database refusal the checks above did not foresee: it must not blame the email
+SAVE_CONFLICT = "The customer could not be saved: the data conflicts with an existing record"
 
 
 def get_customer(db, customer_id: int):
@@ -45,6 +48,8 @@ def add_customer(db: Session, data: CustomerIn) -> Customer:
 
     if customer_repositories.email_exists(db, customer_data["email"]):
         raise ConflictError(DUPLICATE_EMAIL)
+    if customer_repositories.phone_exists(db, customer_data["phone"]):
+        raise ConflictError(DUPLICATE_PHONE)
 
     customer = Customer(**customer_data)
     credit_score.refresh_credit_score(db, customer)  # no loans yet
@@ -54,7 +59,7 @@ def add_customer(db: Session, data: CustomerIn) -> Customer:
 
 
 def create_customer(db: Session, data: CustomerIn) -> Customer:
-    with transaction(db, DUPLICATE_EMAIL):
+    with transaction(db, SAVE_CONFLICT):
         customer = add_customer(db, data)
     db.refresh(customer)
     return customer
@@ -65,8 +70,10 @@ def update_customer(db: Session, customer_id: int, data: CustomerIn) -> Customer
 
     if customer_repositories.email_taken_by_other(db, data.email, customer_id):
         raise ConflictError(DUPLICATE_EMAIL)
+    if customer_repositories.phone_taken_by_other(db, data.phone, customer_id):
+        raise ConflictError(DUPLICATE_PHONE)
 
-    with transaction(db, DUPLICATE_EMAIL):
+    with transaction(db, SAVE_CONFLICT):
         for key, value in data.model_dump().items():
             setattr(customer, key, value)
         # Income or date of birth may have changed
