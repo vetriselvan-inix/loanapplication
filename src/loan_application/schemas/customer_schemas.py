@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class CustomerIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=50)  # the database column holds 50
     email: EmailStr
     phone: str = Field(
         default_factory=lambda: str(random.randint(1000000000, 9999999999))
@@ -24,6 +24,8 @@ class CustomerIn(BaseModel):
             raise ValueError("Name cannot be empty")
         if len(value) < 3:
             raise ValueError("Name must be at least 3 characters long")
+        if not re.fullmatch(r"[A-Za-z ]+", value):  # the same rule the database enforces
+            raise ValueError("Name can contain only letters and spaces")
         return value
 
     @field_validator("phone")

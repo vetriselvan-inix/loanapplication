@@ -31,6 +31,9 @@ from langchain_ollama import ChatOllama
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "day3_rag"))
 from policy_tools import percent_of, search_policy  # noqa: E402  (Day 3 tools; builds the policy index on import)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "day4_langgraph"))
+from prescreen_tool import make_prescreen_tool  # noqa: E402  (Day 4: the pre-screening graph as a tool)
+
 sys.stdout.reconfigure(encoding="utf-8")  # the Windows console cannot print the rupee sign otherwise
 
 BASE_PROMPT = """You are an assistant for a loan application. You only help with loans: eligibility, interest rates, EMI and what the loan policy says. Amounts are in rupees. Keep answers short.
@@ -46,6 +49,7 @@ Choose the tool by the kind of question:
 - A question about a customer (eligibility, income, existing loans, credit score): call get_customer and check_eligibility.
 - A question about why a customer has a certain credit score: call get_customer and explain the score from its credit_score_breakdown (base 300, income points, EMI points, age points). Use the numbers it returns and do not work them out yourself.
 - When a customer is not eligible, explain the advice that check_eligibility returns: what could change the outcome, and what cannot.
+- The user asks whether a loan of a given amount and tenure would be approved, or wants a decision on it: call prescreen_loan with the amount and tenure (and the customer id for an officer). Tell them the decision it returns (approve, refer, reject or need_info) and its reason. Refer means an officer must review it. It is only a pre-screen, nothing is applied for.
 - A question with several parts: call every tool it needs.
 
 Rules:
@@ -96,6 +100,7 @@ def build_agent(session: AppSession):
         model=model,
         tools=[
             *make_api_tools(session),
+            make_prescreen_tool(session),
             get_interest_rate,
             emi_calculator,
             compare_tenures,

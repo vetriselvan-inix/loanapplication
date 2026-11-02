@@ -85,6 +85,46 @@ def test_update_to_taken_email_is_409(client, officer_headers, alice, bob):
     assert r.status_code == 409
 
 
+def test_update_to_taken_phone_names_the_phone(client, officer_headers, alice, bob):
+    r = client.put(
+        f"/customers/{bob.id}",
+        json=customer_payload(email=bob.email, phone=alice.phone),
+        headers=officer_headers,
+    )
+    assert r.status_code == 409
+    assert "phone" in r.json()["message"] and "email" not in r.json()["message"]
+
+
+# ---------- the message names the real problem ----------
+def test_create_duplicate_phone_names_the_phone_not_the_email(client, officer_headers, db):
+    existing = make_customer(db)
+    r = client.post("/customers/", json=customer_payload(phone=existing.phone), headers=officer_headers)
+    assert r.status_code == 409
+    assert "phone" in r.json()["message"] and "email" not in r.json()["message"]
+
+
+@pytest.mark.parametrize("name", ["Test 650", "Ann-Marie", "R2 D2"])
+def test_a_name_with_anything_but_letters_and_spaces_is_400_with_a_clear_reason(client, officer_headers, name):
+    r = client.post("/customers/", json=customer_payload(name=name), headers=officer_headers)
+    assert r.status_code == 400
+    assert "letters and spaces" in str(r.json())
+
+
+def test_a_name_longer_than_the_database_allows_is_400(client, officer_headers):
+    r = client.post("/customers/", json=customer_payload(name="A" * 51), headers=officer_headers)
+    assert r.status_code == 400
+
+
+def test_update_to_a_name_with_digits_is_400_not_an_email_message(client, officer_headers, alice):
+    r = client.put(
+        f"/customers/{alice.id}",
+        json=customer_payload(email=alice.email, phone=alice.phone, name="Test 650"),
+        headers=officer_headers,
+    )
+    assert r.status_code == 400
+    assert "email" not in str(r.json()["message"]).lower()
+
+
 # ---------- delete ----------
 def test_officer_deletes_customer(client, officer_headers, alice):
     assert client.delete(f"/customers/{alice.id}", headers=officer_headers).status_code == 200

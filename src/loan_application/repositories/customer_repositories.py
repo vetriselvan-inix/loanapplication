@@ -25,6 +25,15 @@ def email_taken_by_other(db: Session, email: str, customer_id: int) -> bool:
     return db.scalar(stmt) is not None
 
 
+def phone_exists(db: Session, phone: str) -> bool:
+    return db.scalar(select(Customer.id).where(Customer.phone == phone)) is not None
+
+
+def phone_taken_by_other(db: Session, phone: str, customer_id: int) -> bool:
+    stmt = select(Customer.id).where(Customer.phone == phone, Customer.id != customer_id)
+    return db.scalar(stmt) is not None
+
+
 def add(db: Session, customer: Customer) -> None:
     db.add(customer)
 
